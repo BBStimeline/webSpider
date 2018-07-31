@@ -23,22 +23,24 @@ object EducationClient {
       val l=list.forEach{r=>
         val url=r.getElementsByTag("a").first().attr("href")
         val title=r.text()
-        println((url,title))
+        val id=url.split("#")(1)
+        println(("https://www.tandfonline.com"+url,id,title))
+        IssueDao.addVolume(SlickTables.rVolumes("https://www.tandfonline.com"+url,id,title))
       }
     }catch {case e:Exception=>
       println(e.getMessage)
     }
   }
 
-  def parseIssueList(content:String,id:String)={
+  def parseIssueList(content:String,id:String,t:String)={
     val doc = Jsoup.parse(content)
     try {
-      val list=doc.getElementsByClass("list-of-issues").first().getElementById(id).getElementsByTag("a")
+      val list=doc.getElementsByClass("list-of-issues").first().getElementById(id).getElementsByTag("ul").first().getElementsByTag("a")
       val l=list.forEach{r=>
-        val url=r.attr("href").split("/")(2)
-        val title=r.text()
-        IssueDao.addInfo(SlickTables.rIssues(url,title))
-        println((url,title))
+        val url=r.attr("href")
+        val title=r.getElementsByTag("div").first().text()
+        IssueDao.addInfo(SlickTables.rIssues(url,t+","+title,0,1))
+        println((url,t+","+title,0,1))
       }
     }catch {case e:Exception=>
       println(e.getMessage)
@@ -47,11 +49,14 @@ object EducationClient {
 
   def parseArticleList(content:String)={
     val doc = Jsoup.parse(content)
-    var issueList = List[String]()
+    var issueList = List[(String,String,String)]()
     try {
-      val list=doc.getElementById("articles_list_wrap").select("div .card").select(".row").select(".small-30")
+      val list=doc.getElementsByClass("articleEntry")
       list.forEach{r=>
-        issueList= r.getElementsByTag("a").first().attr("href") ::issueList
+        val divTag=r.getElementsByClass("hlFld-Title").first().parent().getElementsByTag("a").first().attr("href")
+        val page=r.getElementsByClass("tocPageRange").first().text()
+        val date=r.getElementsByClass("tocEPubDate").first().getElementsByTag("span").first().ownText()
+        issueList= (divTag,page,date)::issueList
       }
       issueList.reverse
     }catch {case e:Exception=>

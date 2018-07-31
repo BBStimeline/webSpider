@@ -8,7 +8,7 @@ import com.neo.sk.webSpider.common.AppSettings
 import com.neo.sk.webSpider.core.ArticleActor.StartArticle
 import com.neo.sk.webSpider.models.SlickTables
 import com.neo.sk.webSpider.models.dao.{ArticleDao, IssueDao}
-import com.neo.sk.webSpider.utils.{MuseClient, SeleniumClient, TimeUtil}
+import com.neo.sk.webSpider.utils._
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
@@ -28,8 +28,9 @@ object IssueActor {
   final case class ChildDead(name:String,childRef:ActorRef[ArticleActor.Command]) extends Command
   private case class SwitchBehavior(name: String, behavior: Behavior[Command]) extends Command
   case class StartIssue(link: String) extends Command
-  case class AddArticleList(list: List[String]) extends Command
+  case class AddArticleList(list: List[(String,String,String)]) extends Command
   case object AddUndoArticleList extends Command
+  val baseUrl="https://www.tandfonline.com"
 
   def init(url: String,issue:String): Behavior[Command] = {
     Behaviors.setup[Command] { ctx =>
@@ -47,21 +48,29 @@ object IssueActor {
       msg match {
         case msg:StartIssue=>
           println(msg)
-          Future{
-            val content=SeleniumClient.fetch("http://muse.jhu.edu/issue/"+msg.link)
-            val list=MuseClient.parseArticleList(content)
+          /*Future{
+            val content=SeleniumClient.fetch("https://www.tandfonline.com"+msg.link)
+            val list=EducationClient.parseArticleList(content)
             ctx.self ! AddArticleList(list)
+          }*/
+          HttpClientUtil.fetch(baseUrl+msg.link,None,None,None).map{
+            case Right(t) =>
+              val list=EducationClient.parseArticleList(t)
+              ctx.self ! AddArticleList(list)
+            case Left(e) =>
+              println(e)
+              timer.startSingleTimer(TimeOutKey,msg,5.minutes)
           }
           Behaviors.same
 
         case msg:AddArticleList=>
           msg.list.map{r=>
-            hash.enqueue(r)
-            ArticleDao.addInfo(SlickTables.rArticles(id = r,issue = issue,issueId = url))
+            hash.enqueue(r._1)
+            ArticleDao.addInfo(SlickTables.rArticles(id = r._1,page= r._2,issue = issue,fulltext = r._3,issueId = url))
           }
           for(i<-0 to 2){
             val a=hash.dequeue()
-            getArticleActor(ctx,issue,url,a) ! StartArticle("http://muse.jhu.edu"+a)
+            getArticleActor(ctx,issue,url,a) ! StartArticle(baseUrl+a)
           }
           Behaviors.same
 
@@ -73,7 +82,7 @@ object IssueActor {
             println(s"issue${url} --article count=${ls.size}")
             for(i<-0 to 1){
               val a=hash.dequeue()
-              getArticleActor(ctx,issue,url,a) ! StartArticle("http://muse.jhu.edu"+a)
+              getArticleActor(ctx,issue,url,a) ! StartArticle(baseUrl+a)
             }
           }
           Behaviors.same
@@ -81,9 +90,10 @@ object IssueActor {
         case msg:ChildDead=>
           log.info(s"${msg.name} is dead")
           val a=hash.dequeue()
-          getArticleActor(ctx,issue,url,a) ! StartArticle("http://muse.jhu.edu"+a)
+          getArticleActor(ctx,issue,url,a) ! StartArticle(baseUrl+a)
           if(hash.isEmpty){
             println(s"issue-$url is stopping")
+            IssueDao.updateIssue(url)
             Behaviors.stopped
           }
           Behaviors.same

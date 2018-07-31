@@ -28,7 +28,7 @@ object ArticleActor {
   case class StartArticle(link: String) extends Command
   case class AddArticle(unit: SlickTables.rArticles) extends Command
   case class UpdateArticle(unit: SlickTables.rArticles) extends Command
-  def init(issue:String,issueId:String,dataId: String): Behavior[Command] = {
+  def init(issue:String,issueId:String, dataId: String): Behavior[Command] = {
     Behaviors.setup[Command] { ctx =>
       implicit val stashBuffer = StashBuffer[Command](Int.MaxValue)
       log.info(s"articleActor--$dataId is starting")
@@ -50,7 +50,7 @@ object ArticleActor {
           }*/
           HttpClientUtil.fetch(msg.link,None,None,None).map{
             case Right(t)=>
-              val r=MuseClient.parseArticleFull(t)
+              val r=EducationClient.parseArticleFull(t)
               ctx.self ! AddArticle(r)
             case Left(e)=>
               println(e)

@@ -20,7 +20,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import com.neo.sk.webSpider.Boot.executor
 import com.neo.sk.webSpider.common.AppSettings
-import com.neo.sk.webSpider.models.dao.ArticleDao
+import com.neo.sk.webSpider.models.dao.{ArticleDao, IssueDao}
 import org.apache.http.auth.{AuthScope, UsernamePasswordCredentials}
 import org.apache.http.config.{ConnectionConfig, MessageConstraints}
 import org.apache.http.conn.ConnectTimeoutException
@@ -251,35 +251,45 @@ object HttpClientUtil {
     }
   }
 
+
   def main(args: Array[String]): Unit = {
     println(s"start")
 
-    /*ArticleDao.getUndoList.map{ls=>
-      ls.map{l=>
-        ArticleDao.getUndoListByIssue(l._1).map{as=>
-          as.map{r=>
-            fetch("http://muse.jhu.edu"+r.id, None, None, None).map{
-              case Right(t)=>
-                println(s"start----${r.id}")
-                val a=MuseClient.parseArticleFull(t)
-                ArticleDao.updateInfo(a.copy(id = r.id,issue = r.issue,issueId = r.issueId))
-              case Left(e)=>
-                println(e)
-            }
+    def test(i:Int):Unit={
+      IssueDao.getVolume(i).map{ as=>
+        as.foreach{ r=>
+          println(r)
+          fetch(r.url, None, None, None).map {
+            case Right(t) =>
+              EducationClient.parseIssueList(t,r.id,r.title)
+              IssueDao.updateVolume(r.id).map{r=>
+                if(i<52){
+                  test(i+1)
+                }
+              }
+            case Left(e)=>
+              println(e)
+              if(i<52){
+                test(i+1)
+              }
           }
         }
       }
-    }*/
-
-    fetch("https://www.tandfonline.com/loi/mced20?open=51&year=2018&repitition=0#vol_51_2018", None, None, None).map{
-      case Right(t)=>
-        println(t)
-//        EducationClient.parseVolumeList(t)
-      case Left(e)=>
-        println(e)
     }
 
+//    test(1)
 
+//
+//    val url1="https://www.tandfonline.com/loi/mced20"
+    val url2="https://www.tandfonline.com/toc/mced20/41/3?nav=tocList"
+    fetch(url2, None, None, None).map {
+      case Right(t) =>
+        val a=EducationClient.parseArticleList(t)
+        println(a)
+        println(a.size)
+      case Left(e) =>
+        println(e)
+    }
     println(s"end")
   }
 

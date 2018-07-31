@@ -27,8 +27,12 @@ object ArticleDao {
     db.run(tArticles.filter(r=>r.issueId===issueId&& (r.title==="")).result)
   }
 
-  def updateInfo(r:rArticles)={
+/*  def updateInfo(r:rArticles)={
     db.run(tArticles.filter(_.id===r.id).update(r))
+  }*/
+
+  def updateInfo(r:rArticles)={
+    db.run(tArticles.filter(_.id===r.id).map(r=>()).update(r))
   }
 
   def updateDone(id:String)={
@@ -98,10 +102,5 @@ object ArticleDao {
       case e:Exception=>
         println("save history exception:"+e.getStackTrace)
     }
-  }
-
-  def main(args: Array[String]): Unit = {
-    test
-    Thread.sleep(500000)
   }
 }

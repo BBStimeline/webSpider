@@ -52,14 +52,16 @@ object SpiderManager {
       msg match {
         case TimeOut=>
           val a=hash.dequeue()
-//          getIssueActor(ctx,a._1,a._2) ! StartIssue(a._1)
-          getIssueActor(ctx,a._1,a._2) ! AddUndoArticleList
+          getIssueActor(ctx,a._1,a._2) ! StartIssue(a._1)
+//          getIssueActor(ctx,a._1,a._2) ! AddUndoArticleList
           Behaviors.same
 
         case msg: AddIssueList =>
           msg.list.foreach { r =>
             hash.enqueue(r)
           }
+          count1=msg.list.size
+          println(s"issue---count=$count1")
           Behaviors.same
 
         case msg: AddUndoIssueList =>
