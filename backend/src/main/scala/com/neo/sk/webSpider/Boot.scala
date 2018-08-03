@@ -37,6 +37,8 @@ object Boot extends HttpService {
 
   val spiderManager=system.spawn(SpiderManager.behavior,"spiderManager")
 
+  val proxyActor=system.spawn(ProxyActor.behavior,"proxyActor")
+
   def main(args: Array[String]) {
     log.info("Starting.")
     val binding = Http().bindAndHandle(routes, httpInterface, httpPort)

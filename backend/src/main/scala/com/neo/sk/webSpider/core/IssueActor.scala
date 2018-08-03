@@ -3,9 +3,10 @@ package com.neo.sk.webSpider.core
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors, StashBuffer, TimerScheduler}
 import akka.actor.typed.{ActorRef, Behavior}
-import com.neo.sk.webSpider.Boot.{executor, scheduler, spiderManager, timeout}
+import com.neo.sk.webSpider.Boot.{executor, proxyActor, scheduler, spiderManager, timeout}
 import com.neo.sk.webSpider.common.AppSettings
-import com.neo.sk.webSpider.core.ArticleActor.StartArticle
+import com.neo.sk.webSpider.core.ArticleActor.{StartArticle, StartRefArticle}
+import com.neo.sk.webSpider.core.ProxyActor.GetProxy
 import com.neo.sk.webSpider.models.SlickTables
 import com.neo.sk.webSpider.models.dao.{ArticleDao, IssueDao}
 import com.neo.sk.webSpider.utils._
@@ -35,44 +36,63 @@ object IssueActor {
   def init(url: String,issue:String): Behavior[Command] = {
     Behaviors.setup[Command] { ctx =>
       log.debug(s"spiderActor--$url is starting")
+      println(s"startIssue--$url")
       implicit val stashBuffer = StashBuffer[Command](Int.MaxValue)
       Behaviors.withTimers[Command] { implicit timer =>
         val hash: mutable.Queue[String] = mutable.Queue()
-        idle(url,issue)(hash)
+        ArticleDao.getArticleByIssue(url).map{r=>
+          ctx.self ! SwitchBehavior("idle",idle(url,issue,r.toSet)(hash))
+        }
+//        idle(url,issue,Set.empty)(hash)
+        busy(Nil)
       }
     }
   }
 
-  private def idle(url:String,issue:String)(hash: mutable.Queue[String] = mutable.Queue())(implicit stashBuffer: StashBuffer[Command], timer: TimerScheduler[Command]): Behavior[Command] = {
+  private def idle(url:String,issue:String,hasDone:Set[String])(hash: mutable.Queue[String] = mutable.Queue())(implicit stashBuffer: StashBuffer[Command], timer: TimerScheduler[Command]): Behavior[Command] = {
+    var count1=0
+    var count2=0
     Behaviors.immutable[Command] { (ctx, msg) =>
       msg match {
         case msg:StartIssue=>
-          println(msg)
           /*Future{
             val content=SeleniumClient.fetch("https://www.tandfonline.com"+msg.link)
             val list=EducationClient.parseArticleList(content)
             ctx.self ! AddArticleList(list)
           }*/
-          HttpClientUtil.fetch(baseUrl+msg.link,None,None,None).map{
-            case Right(t) =>
-              val list=EducationClient.parseArticleList(t)
-              ctx.self ! AddArticleList(list)
-            case Left(e) =>
-              println(e)
-              timer.startSingleTimer(TimeOutKey,msg,5.minutes)
+          val future:Future[Option[String]]=proxyActor ? (GetProxy(_))
+          future.map{r=>
+            HttpClientUtil.fetch(baseUrl+msg.link,r,None,None).map{
+              case Right(t) =>
+                val list=EducationClient.parseArticleList(t)
+                ctx.self ! AddArticleList(list)
+              case Left(e) =>
+                log.info(url+"--- limit")
+                timer.startSingleTimer(TimeOutKey,msg,30.seconds)
+            }
           }
           Behaviors.same
 
         case msg:AddArticleList=>
+          println(url+s"-done-${hasDone.size}-notDone--${msg.list.size-hasDone.size}")
           msg.list.map{r=>
-            hash.enqueue(r._1)
-            ArticleDao.addInfo(SlickTables.rArticles(id = r._1,page= r._2,issue = issue,fulltext = r._3,issueId = url))
+            if(!hasDone.contains(r._1)){
+              hash.enqueue(r._1)
+              ArticleDao.addInfo(SlickTables.rArticles(id = r._1,page= r._2,issue = issue,fulltext = r._3,issueId = url,union = 1))
+            }
           }
-          for(i<-0 to 2){
-            val a=hash.dequeue()
-            getArticleActor(ctx,issue,url,a) ! StartArticle(baseUrl+a)
+          if(msg.list.size>hasDone.size){
+            IssueDao.updateIssue(url)
+            val t=math.min(7,hash.size-1)
+            for(i<-0 to t){
+              val a=hash.dequeue()
+              getArticleActor(ctx,issue,url,a) ! StartArticle(baseUrl+a)
+            }
+            Behaviors.same
+          }else{
+            println(s"issue-$url is stopping")
+            Behaviors.stopped
           }
-          Behaviors.same
 
         case AddUndoArticleList=>
           ArticleDao.getUndoListByIssue(url).map{ ls=>
@@ -80,8 +100,11 @@ object IssueActor {
               hash.enqueue(r.id)
             }
             println(s"issue${url} --article count=${ls.size}")
-            for(i<-0 to 1){
+            count1=ls.size
+            val t=math.min(5,hash.size-1)
+            for(i<-0 to t){
               val a=hash.dequeue()
+//              getArticleActor(ctx,issue,url,a) ! StartRefArticle(baseUrl+a.replace("doi/abs", "doi/ref").replace("doi/full", "doi/ref"))
               getArticleActor(ctx,issue,url,a) ! StartArticle(baseUrl+a)
             }
           }
@@ -89,14 +112,22 @@ object IssueActor {
 
         case msg:ChildDead=>
           log.info(s"${msg.name} is dead")
-          val a=hash.dequeue()
-          getArticleActor(ctx,issue,url,a) ! StartArticle(baseUrl+a)
+          count2+=1
           if(hash.isEmpty){
-            println(s"issue-$url is stopping")
-            IssueDao.updateIssue(url)
-            Behaviors.stopped
+            if(count1==count2){
+              log.info(s"$url-count-$count1--$count2")
+              println(s"issue-$url is stopping")
+              Behaviors.stopped
+            }else{
+              log.info(s"$url-count-$count1--$count2")
+              Behaviors.same
+            }
+          }else{
+            val a=hash.dequeue()
+            getArticleActor(ctx,issue,url,a) ! StartArticle(baseUrl+a)
+            Behaviors.same
           }
-          Behaviors.same
+
 
         case x =>
           log.warn(s"unknown msg: $x")
@@ -117,8 +148,8 @@ object IssueActor {
     }
 
   private def getArticleActor(ctx: ActorContext[Command],issue:String,issueId:String, id:String) = {
-    val childName = s"articleActor-${id.replace("/","-")}"
-    println(childName)
+    val childName = s"articleActor-${id.replace("/","-").replace("?","-").replace("=","-")}"
+    log.info(childName)
     ctx.child(childName).getOrElse {
       val actor=ctx.spawn(ArticleActor.init(issue,issueId,id), childName)
       ctx.watchWith(actor,ChildDead(childName,actor))

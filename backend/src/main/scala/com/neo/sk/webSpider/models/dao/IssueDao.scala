@@ -28,12 +28,16 @@ object IssueDao {
     db.run(tIssues.filter(r=>r.union===1&&r.isDone===0).result)
   }
 
+  def getAllData={
+    db.run(tIssues.filter(r=>r.union===1&&r.isDone===0).map(r=>(r.id,r.issue)).result)
+  }
+
   def updateVolume(id:String)={
     db.run(tVolumes.filter(_.id===id).map(_.isDone).update(1))
   }
 
   def updateIssue(id:String)={
-    db.run(tIssues.filter(_.id===id).map(_.isDone).update(1))
+    db.run(tIssues.filter(_.id===id).map(_.isDone).update(2))
   }
 
   def getVolume(num:Int)=db.run(tVolumes.filter(_.isDone===0).sortBy(_.id).take(1).result)

@@ -42,7 +42,7 @@ object SpiderManager {
 
   val behavior: Behavior[Command] = Behaviors.setup[Command] {ctx=>
     Behaviors.withTimers[Command] { implicit timer =>
-      timer.startPeriodicTimer(TimeOutKey,TimeOut,1.minutes)
+      timer.startPeriodicTimer(TimeOutKey,TimeOut,5.minutes)
       idle
     }
   }
@@ -62,6 +62,11 @@ object SpiderManager {
           }
           count1=msg.list.size
           println(s"issue---count=$count1")
+          val t=math.min(7,hash.size-1)
+          for(i<-0 to t){
+            val a=hash.dequeue()
+            getIssueActor(ctx,a._1,a._2) ! StartIssue(a._1)
+          }
           Behaviors.same
 
         case msg: AddUndoIssueList =>
@@ -69,12 +74,22 @@ object SpiderManager {
             hash.enqueue(r)
           }
           count1=msg.list.size
-          println(s"issue---count=$count1")
+          println(s"issue-undo--count=$count1")
+          val t=math.min(7,hash.size-1)
+          for(i<-0 to t) {
+            val a = hash.dequeue()
+            getIssueActor(ctx, a._1, a._2) ! AddUndoArticleList
+          }
           Behaviors.same
 
         case msg:ChildDead=>
           count2+=1
+          if(hash.nonEmpty){
+            val a=hash.dequeue()
+            getIssueActor(ctx,a._1,a._2) ! AddUndoArticleList
+          }
           if(count1==count2){
+            log.info("all fetch over")
             println("all fetch over")
           }
           Behaviors.same
@@ -87,8 +102,8 @@ object SpiderManager {
   }
 
   private def getIssueActor(ctx: ActorContext[Command], id:String, issue:String) = {
-    val childName = s"issueActor-${id}"
-    println(childName)
+    val childName = s"issueActor-${id.replace("/","-").replace("?","-").replace("=","-")}"
+    log.info(childName)
     ctx.child(childName).getOrElse {
       val actor=ctx.spawn(IssueActor.init(id,issue), childName)
       ctx.watchWith(actor,ChildDead(childName,actor))

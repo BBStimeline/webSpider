@@ -65,96 +65,151 @@ object EducationClient {
     }
   }
 
-  def parseArticleFull(content:String)={
-    //    val t1=System.currentTimeMillis()
+  def parseArticleFull(content:String,url:String)={
     val doc = Jsoup.parse(content)
     try {
+      //fullText ==  online date
       var title=""
+      var subTitle=""
       var abs=""
       var authors=List[String]()
       var authorInfo=List[String]()
       var index=List[String]()
-      var fullText=""
+      var fullTextOnline=""
       var mail=List[String]()
       var page=""
       var doi=""
       var articleType=""
-      val mainDiv=doc.getElementsByClass("card_text").first().getElementsByTag("ul").first()
-      try{
-        title+=mainDiv.getElementsByClass("title").text()
-        if(title==""){
-          title+=doc.getElementById("front").getElementsByClass("card_text").first().getElementsByTag("ul").first()
-            .getElementsByClass("title").first().getElementById("article-title").text()
+      var conRef=false
+
+      if(url.contains("doi/full")){
+        try{
+          title=doc.getElementsByClass("NLM_article-title").first().text()
+        }catch {case e:Exception=>
+          println("title1"+e.getMessage)
         }
-      }catch {case e:Exception=>
-        println("title"+e.getMessage)
+        try{
+          abs+=doc.getElementsByClass("abstractSection").get(0).text()
+        }catch {case e:Exception=>
+          println("abs"+e.getMessage)
+        }
+      }else{
+        try{
+          title=doc.select("meta[name=dc.Title]").get(0).attr("content")
+        }catch {case e:Exception=>
+          println("title"+e.getMessage)
+        }
+        try{
+          abs+=doc.select("meta[name=dc.Description]").get(0).attr("content")
+        }catch {case e:Exception=>
+          println("abs"+e.getMessage)
+        }
       }
       try{
-        if(doc.getElementsByClass("abstract").first().getElementById("body")==null){
-          abs=doc.getElementsByClass("abstract").first().getElementsByTag("p").first().text()
-        }else{
-          doc.getElementsByClass("abstract").first().getElementById("body").
-            getElementsByTag("p").forEach(r=>abs+=r.text())
-        }
+        subTitle=doc.getElementsByClass("sub-title").first().text()
       }catch {case e:Exception=>
-        println("abs"+e.getMessage)
+        println("subTitle"+e.getMessage)
       }
+
       try{
         try {
-          mainDiv.getElementsByClass("authors").first().getElementsByTag("a").forEach(r=>authors= r.text() ::authors)
+          val mainDiv=doc.getElementsByClass("hlFld-ContribAuthor").first()
+          mainDiv.getElementsByClass("entryAuthor").forEach{r=>
+            authors=r.ownText()::authors
+            try {
+              var overTitle=r.getElementsByClass("overlay").first().text()
+              if(overTitle=="View further author information"){
+                val id=r.getElementsByClass("overlay").first().getElementsByClass("author-extra-info").first().attr("data-authorsinfo").split("\"")(3)
+                overTitle=doc.getElementById(id).getElementsByTag("span").first().ownText()
+              }
+              authorInfo=overTitle::authorInfo
+            }catch {case e:Exception=>
+              println("authorInfo"+e.getMessage)
+            }
+          }
         }catch {case e:Exception=>
           println("author1"+e.getMessage)
-        }
-        if(authors.isEmpty){
-          try {
-            authors=List(doc.getElementById("front").getElementsByClass("card_text").first().getElementsByTag("ul").first()
-              .getElementsByClass("author").first().getElementsByTag("a").first().text()
-            )
-          }catch {case e:Exception=>
-            println("author2"+e.getMessage)
-          }
         }
       }catch {case e:Exception=>
         println("author"+e.getMessage)
       }
-      try {
-        if(doc.getElementById("back")!=null){
-          authorInfo=List(doc.getElementById("back").getElementsByClass("bio").first().getElementsByTag("p").first().ownText())
-        }
-      }catch {case e:Exception=>
-        println("authorInfo"+e.getMessage)
-      }
+
       try{
-        page=mainDiv.getElementsByClass("pg").first().text()
-      }catch {case e:Exception=>
-        println("index"+e.getMessage)
-      }
-      try{
-        doi=mainDiv.getElementsByClass("doi").first().text()
+        doi=doc.getElementsByClass("dx-doi").first().text()
       }catch {case e:Exception=>
         println("doi"+e.getMessage)
       }
+
       try{
-        articleType=mainDiv.getElementsByClass("type").first().text()
+        articleType=doc.getElementsByClass("toc-heading").first().text()
       }catch {case e:Exception=>
         println("articleType"+e.getMessage)
       }
-      //      println(title,authors.reverse,authorInfo.reverse,mail.reverse,abs,index.reverse,page)
-      //      println(System.currentTimeMillis()-t1)
-      //      println(title)
-      //      println(authors.reverse)
-      //      println(authorInfo.reverse)
-      //      println(mail.reverse)
-      //      println(abs)
-      //      println(index.reverse)
-      //      println(page)
-      //      println(doi)
-      //      println(articleType)
+
+      try {
+        doc.getElementsByClass("abstractKeywords").first().getElementsByTag("a").forEach{r=>
+          index=r.text()::index
+        }
+      }catch {case e:Exception=>
+        println("index"+e.getMessage)
+      }
+
+      try {
+        conRef=doc.getElementsByClass("tab-nav").first().text().contains("References")
+      }catch {case e:Exception=>
+        println("conRef"+e.getMessage)
+      }
+//            println(title,authors.reverse,authorInfo.reverse,mail.reverse,abs,index.reverse,page)
+//            println(title)
+//            println(subTitle)
+//            println(authors.reverse.mkString("%"))
+//            println(makeList(authorInfo.reverse))
+//            println(makeList(mail.reverse))
+//            println(abs)
+//            println(index.reverse)
+//            println(page)
+//            println(doi)
+//            println(articleType)
+//            println(conRef)
       //
-      SlickTables.rArticles("","",title,authors.mkString("%"),authorInfo.mkString("||"),mail.mkString(";"),page,abs,index.mkString(";"),fullText,"",articleType,doi,3,"")
+      (SlickTables.rArticles("","",title,authors.reverse.mkString("%"),makeList(authorInfo.reverse),"",page,abs,index.reverse.mkString(";"),fullTextOnline,"",articleType,doi,3,"",1,content,subTitle),conRef)
     }catch {case e:Exception=>
       println(e.getMessage)
-      SlickTables.rArticles().copy(isDone = 3)
+      (SlickTables.rArticles().copy(isDone = 3),false)
     }
+  }
+
+  def parseArticleRef(content:String)= {
+    val doc = Jsoup.parse(content)
+    var ref=List[String]()
+    try {
+      val mainDiv=doc.getElementsByClass("references").first().getElementsByTag("li")
+      mainDiv.forEach{r=>
+        val con=r.getElementsByTag("span").first().text()
+        ref=con::ref
+      }
+//      println(ref.size)
+//      println(makeList(ref))
+      makeList(ref)
+    }catch {case e:Exception=>
+      println(e.getMessage)
+      ""
+    }
+  }
+
+  def makeList(list:List[String])={
+    var a=1
+    var con=""
+    if(list.size>1){
+      list.foreach{r=>
+        con+="["+a.toString+"]."+r
+        a+=1
+      }
+    }else{
+      list.foreach{r=>
+        con+=r
+      }
+    }
+    con
   }
 }

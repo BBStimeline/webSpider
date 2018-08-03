@@ -28,14 +28,22 @@ trait ApiService extends ServiceUtils with SessionBase {
   case class AddIssueList(argType:Int,content:String)
 
   private val start=(path("start")&get){
-    IssueDao.getUndoData.map{ls=>
-      val list=ls.map(r=>(r.id,r.issue)).toList
+    /*IssueDao.getAllData.map{ls=>
+      val list=ls.toList
       spiderManager ! SpiderManager.AddIssueList(list)
-    }
-//    ArticleDao.getUndoList.map{ ls=>
-//      val list=ls.map(r=>(r._1,r._2)).toList.reverse
-//      spiderManager ! SpiderManager.AddUndoIssueList(list)
+    }*/
+
+//    for{
+//      all <- IssueDao.getAllData
+//      hasDone <- ArticleDao.getUndoList
+//    }yield{
+//      val a=all.toSet&~hasDone.toSet
+//      spiderManager ! SpiderManager.AddIssueList(a.toList)
 //    }
+    ArticleDao.getUndoList.map{ ls=>
+      val list=ls.map(r=>(r._1,r._2)).toList.reverse
+      spiderManager ! SpiderManager.AddUndoIssueList(list)
+    }
     complete(SuccessRsp())
   }
 

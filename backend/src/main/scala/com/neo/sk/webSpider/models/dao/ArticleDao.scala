@@ -21,10 +21,11 @@ object ArticleDao {
     db.run(tArticles.returning(tArticles.map(_.id)) += r)
   }
 
-  def getUndoList= db.run(tArticles.filter(r=> r.title==="").groupBy(r=> (r.issueId,r.issue)).map(_._1).result)
+  def getUndoList=
+    db.run(tArticles.filter(r=> r.union===1&&r.id.like("/doi/full%")&&r.content==="").groupBy(r=> (r.issueId,r.issue)).map(_._1).result)
 
   def getUndoListByIssue(issueId:String)={
-    db.run(tArticles.filter(r=>r.issueId===issueId&& (r.title==="")).result)
+    db.run(tArticles.filter(r=>r.union===1&&r.issueId===issueId&&r.id.like("/doi/full%")&&r.content==="").result)
   }
 
 /*  def updateInfo(r:rArticles)={
@@ -32,7 +33,12 @@ object ArticleDao {
   }*/
 
   def updateInfo(r:rArticles)={
-    db.run(tArticles.filter(_.id===r.id).map(r=>()).update(r))
+    db.run(tArticles.filter(_.id===r.id).map(r=>(r.title,r.authors,r.authorinfo,r.abs,r.index,r.classify,r.doi,r.isDone,r.union,r.content,r.subTitle))
+      .update(r.title,r.authors,r.authorinfo,r.abs,r.index,r.classify,r.doi,r.isDone,r.union,r.content,r.subTitle))
+  }
+
+  def updateRef(id:String,r:String)={
+    db.run(tArticles.filter(_.id===id).map(r=>(r.mail,r.isDone)).update(r,3))
   }
 
   def updateDone(id:String)={
@@ -40,7 +46,11 @@ object ArticleDao {
   }
 
   def getAllData={
-    db.run(tArticles.sortBy(_.issueId).result)
+    db.run(tArticles.filter(r=>r.union===1).sortBy(_.issue).result)
+  }
+
+  def getArticleByIssue(issue:String)={
+    db.run(tArticles.filter(r=>r.union===1&&r.issueId===issue).map(_.issueId).result)
   }
 
 
@@ -52,7 +62,7 @@ object ArticleDao {
 
   def test={
     try {
-      val out = new FileOutputStream(s"muse.csv")
+      val out = new FileOutputStream(s"education.csv")
       val outWriter = new OutputStreamWriter(out, "GBK")
       val bufWrite = new BufferedWriter(outWriter)
       bufWrite.write("英文标题|中文标题（有则直接粘贴，若没有也不必翻译）|期刊名称|国际标准刊号（ISSN）" +
@@ -62,8 +72,8 @@ object ArticleDao {
       var count=0
       getAllData.map{ls=>
         ls.foreach{l=>
-          val issue=l.issue.split(",")
-          val classify=if(l.title.contains(" histor")||l.title.contains("Histor")||l.title.contains("Dynasty")) "中国历史"
+
+          /*val classify=if(l.title.contains(" histor")||l.title.contains("Histor")||l.title.contains("Dynasty")) "中国历史"
           else if(l.title.contains(" art")||l.title.contains("Art")) "中国艺术"
           else if(l.title.contains(" educat")||l.title.contains("Educat")) "中国教育"
           else if(l.title.contains(" politic")||l.title.contains("Politic")||l.title.contains("Taiwan")) "中国政治"
@@ -83,15 +93,23 @@ object ArticleDao {
             else if (a>=80&&a<90) "中国历史"
             else if(a>=90&&a<95) "社会科学"
             else "其他"
-          }
+          }*/
 
-          val title=if(l.title.contains("(review)")) l.title.replace("(review)","") else l.title
-          val s=title+"||China Review International: a journal of reviews of scholarly literature in Chinese Studies|1069-5834|"+
-            "English|http://muse.jhu.edu/journal/39|"+issue(2).split(" ").last+s"|${issue(2)}||University of Hawai'i Press|" +
-            s"${issue(0)}|${issue(1)}|${l.page}||${l.authors}|${l.authorinfo}|${l.mail}||${l.abs}|||$classify||${l.classify}|http://muse.jhu.edu${l.id}|" +
-            {if(l.doi=="") "" else s"https://doi.org/${l.doi}"}+"||\r\n"
-          bufWrite.write(s)
-          bufWrite.flush()
+//          val title=if(l.title.contains("(review)")) l.title.replace("(review)","") else l.title
+          try{
+            count+=1
+            val issue1=l.issue.split(",")
+            val title=if(l.subTitle!="") l.title+":"+l.subTitle else l.title
+            val s=title+"||Chinese Education and Society|1061-1932|"+
+              "English|https://www.tandfonline.com/loi/mced20|"+issue1(0).takeRight(4)+s"|${issue1(0).takeRight(4)}|${l.fulltext}|Routledge|" +
+              s"${issue1(0).dropRight(4)}|${issue1(1)}|${l.page}||${l.authors}|${l.authorinfo}|${""}||${l.abs}||${l.index}|${"中国教育"}||${l.classify}|https://www.tandfonline.com${l.id}|" +
+              l.doi+s"|${l.mail}|\r\n"
+            bufWrite.write(s)
+            bufWrite.flush()
+          }catch{
+            case e:Exception=>
+              println(e.getStackTrace)
+          }
         }
         bufWrite.close()
         out.close()
@@ -102,5 +120,12 @@ object ArticleDao {
       case e:Exception=>
         println("save history exception:"+e.getStackTrace)
     }
+  }
+
+  def main(args: Array[String]): Unit = {
+    println("start------")
+    test
+    println("end--------")
+    Thread.sleep(500000)
   }
 }

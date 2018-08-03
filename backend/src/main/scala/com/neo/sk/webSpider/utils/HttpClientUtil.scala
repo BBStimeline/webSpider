@@ -177,6 +177,7 @@ object HttpClientUtil {
         } else {
           Left(str)
         }
+//        Right(str)
       } catch {
         case e: Exception =>
           log.debug(s"fetch url:$url error: $e")
@@ -280,16 +281,26 @@ object HttpClientUtil {
 //    test(1)
 
 //
-//    val url1="https://www.tandfonline.com/loi/mced20"
-    val url2="https://www.tandfonline.com/toc/mced20/41/3?nav=tocList"
-    fetch(url2, None, None, None).map {
+    val url1="https://www.tandfonline.com/doi/abs/10.1080/10611932.2005.11031713"
+    val urlTest1="https://www.tandfonline.com/doi/full/10.1080/10611932.2016.1192382"
+    val urlTest11="https://www.tandfonline.com/doi/abs/10.1080/10611932.2017.1413882"
+    val urlTest2="https://www.tandfonline.com/doi/ref/10.1080/10611932.2005.11031713"
+    val url2="https://www.tandfonline.com/toc/mced19/14/2-3?nav=tocList"
+    val url22="https://www.tandfonline.com/toc/mced19/12/3?nav=tocList"
+    fetch(urlTest1, Some("117.82.124.64:22100"), None, None).map {
       case Right(t) =>
-        val a=EducationClient.parseArticleList(t)
+        println("--start")
+
+//       EducationClient.parseArticleRef(t)
+//        println(EducationClient.parseArticleFull(t))
+        val a=EducationClient.parseArticleFull(t,urlTest1)
         println(a)
-        println(a.size)
       case Left(e) =>
         println(e)
     }
+
+
+//    println(url1.replace("doi/abs","doi/ref"))
     println(s"end")
   }
 
