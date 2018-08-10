@@ -281,20 +281,13 @@ object HttpClientUtil {
 //    test(1)
 
 //
-    val url1="https://www.tandfonline.com/doi/abs/10.1080/10611932.2005.11031713"
-    val urlTest1="https://www.tandfonline.com/doi/full/10.1080/10611932.2016.1192382"
-    val urlTest11="https://www.tandfonline.com/doi/abs/10.1080/10611932.2017.1413882"
-    val urlTest2="https://www.tandfonline.com/doi/ref/10.1080/10611932.2005.11031713"
-    val url2="https://www.tandfonline.com/toc/mced19/14/2-3?nav=tocList"
-    val url22="https://www.tandfonline.com/toc/mced19/12/3?nav=tocList"
-    fetch(urlTest1, Some("117.82.124.64:22100"), None, None).map {
+    val url1="https://www.tandfonline.com/loi/mcsh20?open=1&year=1968&repitition=0#vol_1_1968"
+    fetch(url1, Some("125.125.226.226:41067"), None, None).map {
       case Right(t) =>
         println("--start")
-
 //       EducationClient.parseArticleRef(t)
 //        println(EducationClient.parseArticleFull(t))
-        val a=EducationClient.parseArticleFull(t,urlTest1)
-        println(a)
+        EducationClient.parseIssueList(t,"vol_1_1968","Volume 1 1967-1968")
       case Left(e) =>
         println(e)
     }

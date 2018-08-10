@@ -24,6 +24,7 @@ object ArticleActor {
   val log = LoggerFactory.getLogger(this.getClass)
   trait Command
   private final case object TimeOutKey
+  private final case object TimeOutKey2
   case object TimeOut extends Command
 
   case class StartArticle(link: String) extends Command
@@ -63,7 +64,7 @@ object ArticleActor {
                       count+=1
                       log.info(id + s"---success--$count--${count1-count}")
                       ctx.self ! AddArticle(r._1, r._2)
-//                      ctx.self ! StartRefArticle(msg.link.replace("doi/abs", "doi/ref").replace("doi/full", "doi/ref"))
+                      ctx.self ! StartRefArticle(msg.link.replace("doi/abs", "doi/ref").replace("doi/full", "doi/ref"))
                     }
                   }
                 }else{
@@ -81,7 +82,7 @@ object ArticleActor {
                 timer.startSingleTimer(TimeOutKey,msg,60.seconds)
             }
           }
-          timer.startSingleTimer(TimeOutKey,TimeOut,5.minutes)
+          timer.startSingleTimer(TimeOutKey2,TimeOut,5.minutes)
           Behaviors.same
 
         case msg:StartRefArticle=>
@@ -125,21 +126,12 @@ object ArticleActor {
 
         case msg:AddArticle=>
           if(msg.t){
-            /*ArticleDao.updateInfo(msg.unit.copy(id = id,issue = issue,issueId = issueId,isDone = 4)).map { r =>
-              if (r <= 0) log.debug(s"ArticleDao.updateInfo error id=$id")
-            }*/
             Behaviors.stopped
           }else{
-           /* ArticleDao.updateInfo(msg.unit.copy(id = id,issue = issue,issueId = issueId)).map { r =>
-              if (r <= 0) log.debug(s"ArticleDao.updateInfo error id=$id")
-            }*/
             Behaviors.stopped
           }
 
         case msg:AddArticleRef=>
-          /*ArticleDao.updateRef(id,msg.unit).map(r=>
-            if(r<=0) log.debug(s"ArticleDao.updateInfo error id=$id")
-          )*/
           Behaviors.stopped
 
         case TimeOut=>

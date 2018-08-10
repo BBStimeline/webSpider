@@ -17,6 +17,7 @@ import org.openqa.selenium.chrome.ChromeDriver
 object EducationClient {
   def parseVolumeList(content:String)={
     val doc = Jsoup.parse(content)
+    var volumeList = List[(String,String,String)]()
     try {
       val list=doc.getElementsByClass("list-of-issues").first().getElementsByTag("li")
       println(list.size())
@@ -25,10 +26,13 @@ object EducationClient {
         val title=r.text()
         val id=url.split("#")(1)
         println(("https://www.tandfonline.com"+url,id,title))
-        IssueDao.addVolume(SlickTables.rVolumes("https://www.tandfonline.com"+url,id,title))
+        IssueDao.addVolume(SlickTables.rVolumes("https://www.tandfonline.com"+url,id,title,0,3))
+        volumeList=(url,id,title)::volumeList
       }
+      volumeList
     }catch {case e:Exception=>
       println(e.getMessage)
+        Nil
     }
   }
 
@@ -38,9 +42,10 @@ object EducationClient {
       val list=doc.getElementsByClass("list-of-issues").first().getElementById(id).getElementsByTag("ul").first().getElementsByTag("a")
       val l=list.forEach{r=>
         val url=r.attr("href")
-        val title=r.getElementsByTag("div").first().text()
-        IssueDao.addInfo(SlickTables.rIssues(url,t+","+title,0,1))
-        println((url,t+","+title,0,1))
+        val issue=r.getElementsByTag("div").first().text()
+        val year=r.getElementById("loiIssueCoverDateText").text()
+        IssueDao.addInfo(SlickTables.rIssues(url,"Volume "+t.split(" ")(1)+","+issue+","+year,0,3))
+        println((url,"Volume "+t.split(" ")(1)+","+issue+","+year,0,3))
       }
     }catch {case e:Exception=>
       println(e.getMessage)
@@ -172,10 +177,10 @@ object EducationClient {
 //            println(articleType)
 //            println(conRef)
       //
-      (SlickTables.rArticles("","",title,authors.reverse.mkString("%"),makeList(authorInfo.reverse),"",page,abs,index.reverse.mkString(";"),fullTextOnline,"",articleType,doi,3,"",1,content,subTitle),conRef)
+      (SlickTables.rArticles("","",title,authors.reverse.mkString("%"),makeList(authorInfo.reverse),"",page,abs,index.reverse.mkString(";"),fullTextOnline,"",articleType,doi,3,"",2,content,subTitle),conRef)
     }catch {case e:Exception=>
       println(e.getMessage)
-      (SlickTables.rArticles().copy(isDone = 3),false)
+      (SlickTables.rArticles().copy(isDone = 3,union = 2),false)
     }
   }
 
@@ -190,7 +195,7 @@ object EducationClient {
       }
 //      println(ref.size)
 //      println(makeList(ref))
-      makeList(ref)
+      makeList(ref.reverse)
     }catch {case e:Exception=>
       println(e.getMessage)
       ""

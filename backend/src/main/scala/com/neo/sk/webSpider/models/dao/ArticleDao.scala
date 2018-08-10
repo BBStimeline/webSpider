@@ -22,10 +22,10 @@ object ArticleDao {
   }
 
   def getUndoList=
-    db.run(tArticles.filter(r=> r.union===1&&r.id.like("/doi/full%")&&r.content==="").groupBy(r=> (r.issueId,r.issue)).map(_._1).result)
+    db.run(tArticles.filter(r=> (r.union===2||r.union===3)&&(r.isDone===4)).groupBy(r=> (r.issueId,r.issue)).map(_._1).result)
 
   def getUndoListByIssue(issueId:String)={
-    db.run(tArticles.filter(r=>r.union===1&&r.issueId===issueId&&r.id.like("/doi/full%")&&r.content==="").result)
+    db.run(tArticles.filter(r=>(r.union===2||r.union===3)&&r.issueId===issueId&&(r.isDone===4)).result)
   }
 
 /*  def updateInfo(r:rArticles)={
@@ -33,8 +33,8 @@ object ArticleDao {
   }*/
 
   def updateInfo(r:rArticles)={
-    db.run(tArticles.filter(_.id===r.id).map(r=>(r.title,r.authors,r.authorinfo,r.abs,r.index,r.classify,r.doi,r.isDone,r.union,r.content,r.subTitle))
-      .update(r.title,r.authors,r.authorinfo,r.abs,r.index,r.classify,r.doi,r.isDone,r.union,r.content,r.subTitle))
+    db.run(tArticles.filter(_.id===r.id).map(r=>(r.title,r.authors,r.authorinfo,r.abs,r.index,r.classify,r.doi,r.isDone,r.content,r.subTitle))
+      .update(r.title,r.authors,r.authorinfo,r.abs,r.index,r.classify,r.doi,r.isDone,r.content,r.subTitle))
   }
 
   def updateRef(id:String,r:String)={
@@ -46,7 +46,7 @@ object ArticleDao {
   }
 
   def getAllData={
-    db.run(tArticles.filter(r=>r.union===1).sortBy(_.issue).result)
+    db.run(tArticles.filter(r=>r.union===3).sortBy(_.issue).result)
   }
 
   def getArticleByIssue(issue:String)={
@@ -62,7 +62,7 @@ object ArticleDao {
 
   def test={
     try {
-      val out = new FileOutputStream(s"education.csv")
+      val out = new FileOutputStream(s"history.csv")
       val outWriter = new OutputStreamWriter(out, "GBK")
       val bufWrite = new BufferedWriter(outWriter)
       bufWrite.write("英文标题|中文标题（有则直接粘贴，若没有也不必翻译）|期刊名称|国际标准刊号（ISSN）" +
@@ -95,14 +95,14 @@ object ArticleDao {
             else "其他"
           }*/
 
-//          val title=if(l.title.contains("(review)")) l.title.replace("(review)","") else l.title
+//     val title=if(l.title.contains("(review)")) l.title.replace("(review)","") else l.title
           try{
             count+=1
             val issue1=l.issue.split(",")
             val title=if(l.subTitle!="") l.title+":"+l.subTitle else l.title
-            val s=title+"||Chinese Education and Society|1061-1932|"+
-              "English|https://www.tandfonline.com/loi/mced20|"+issue1(0).takeRight(4)+s"|${issue1(0).takeRight(4)}|${l.fulltext}|Routledge|" +
-              s"${issue1(0).dropRight(4)}|${issue1(1)}|${l.page}||${l.authors}|${l.authorinfo}|${""}||${l.abs}||${l.index}|${"中国教育"}||${l.classify}|https://www.tandfonline.com${l.id}|" +
+            val s=title+"||Chinese Studies in History|Print ISSN: 0009-4633 Online ISSN: 1558-0407|"+
+              "English|http://www.tandfonline.com/loi/mcsh20|"+issue1(2).takeRight(4)+s"|${issue1(2)}|${l.fulltext}|Routledge|" +
+              s"${issue1(0)}|${issue1(1)}|${l.page}||${l.authors}|${l.authorinfo}|${""}||${l.abs}||${l.index}|${"中国历史"}||${l.classify}|https://www.tandfonline.com${l.id}|" +
               l.doi+s"|${l.mail}|\r\n"
             bufWrite.write(s)
             bufWrite.flush()

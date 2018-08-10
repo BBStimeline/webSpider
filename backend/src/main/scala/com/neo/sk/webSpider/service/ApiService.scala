@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory
 import com.neo.sk.webSpider.Boot.{executor, spiderManager}
 import com.neo.sk.webSpider.common.AppSettings
 import com.neo.sk.webSpider.core.SpiderManager
+import com.neo.sk.webSpider.core.SpiderManager.StartInit
 import com.neo.sk.webSpider.models.dao.{ArticleDao, IssueDao}
 import com.neo.sk.webSpider.protocols.CommonProtocol.CommonRsp
 import com.neo.sk.webSpider.shared.ptcl.SuccessRsp
@@ -28,7 +29,7 @@ trait ApiService extends ServiceUtils with SessionBase {
   case class AddIssueList(argType:Int,content:String)
 
   private val start=(path("start")&get){
-    /*IssueDao.getAllData.map{ls=>
+ /*   IssueDao.getAllData.map{ls=>
       val list=ls.toList
       spiderManager ! SpiderManager.AddIssueList(list)
     }*/
@@ -44,6 +45,7 @@ trait ApiService extends ServiceUtils with SessionBase {
       val list=ls.map(r=>(r._1,r._2)).toList.reverse
       spiderManager ! SpiderManager.AddUndoIssueList(list)
     }
+//    spiderManager ! StartInit
     complete(SuccessRsp())
   }
 

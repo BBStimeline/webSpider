@@ -29,7 +29,7 @@ object IssueDao {
   }
 
   def getAllData={
-    db.run(tIssues.filter(r=>r.union===1&&r.isDone===0).map(r=>(r.id,r.issue)).result)
+    db.run(tIssues.filter(r=>r.union===3&&r.isDone===0).map(r=>(r.id,r.issue)).result)
   }
 
   def updateVolume(id:String)={

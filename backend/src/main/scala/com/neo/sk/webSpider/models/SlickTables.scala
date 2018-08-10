@@ -123,18 +123,19 @@ trait SlickTables {
    *  @param url Database column url SqlType(varchar), PrimaryKey, Length(255,true), Default()
    *  @param id Database column id SqlType(varchar), Length(255,true), Default()
    *  @param title Database column title SqlType(varchar), Length(255,true), Default()
-   *  @param isDone Database column is_done SqlType(int4), Default(0) */
-  case class rVolumes(url: String = "", id: String = "", title: String = "", isDone: Int = 0)
+   *  @param isDone Database column is_done SqlType(int4), Default(0)
+   *  @param union Database column union SqlType(int4), Default(0) */
+  case class rVolumes(url: String = "", id: String = "", title: String = "", isDone: Int = 0, union: Int = 0)
   /** GetResult implicit for fetching rVolumes objects using plain SQL queries */
   implicit def GetResultrVolumes(implicit e0: GR[String], e1: GR[Int]): GR[rVolumes] = GR{
     prs => import prs._
-    rVolumes.tupled((<<[String], <<[String], <<[String], <<[Int]))
+    rVolumes.tupled((<<[String], <<[String], <<[String], <<[Int], <<[Int]))
   }
   /** Table description of table volumes. Objects of this class serve as prototypes for rows in queries. */
   class tVolumes(_tableTag: Tag) extends profile.api.Table[rVolumes](_tableTag, "volumes") {
-    def * = (url, id, title, isDone) <> (rVolumes.tupled, rVolumes.unapply)
+    def * = (url, id, title, isDone, union) <> (rVolumes.tupled, rVolumes.unapply)
     /** Maps whole row to an option. Useful for outer joins. */
-    def ? = (Rep.Some(url), Rep.Some(id), Rep.Some(title), Rep.Some(isDone)).shaped.<>({r=>import r._; _1.map(_=> rVolumes.tupled((_1.get, _2.get, _3.get, _4.get)))}, (_:Any) =>  throw new Exception("Inserting into ? projection not supported."))
+    def ? = (Rep.Some(url), Rep.Some(id), Rep.Some(title), Rep.Some(isDone), Rep.Some(union)).shaped.<>({r=>import r._; _1.map(_=> rVolumes.tupled((_1.get, _2.get, _3.get, _4.get, _5.get)))}, (_:Any) =>  throw new Exception("Inserting into ? projection not supported."))
 
     /** Database column url SqlType(varchar), PrimaryKey, Length(255,true), Default() */
     val url: Rep[String] = column[String]("url", O.PrimaryKey, O.Length(255,varying=true), O.Default(""))
@@ -144,6 +145,8 @@ trait SlickTables {
     val title: Rep[String] = column[String]("title", O.Length(255,varying=true), O.Default(""))
     /** Database column is_done SqlType(int4), Default(0) */
     val isDone: Rep[Int] = column[Int]("is_done", O.Default(0))
+    /** Database column union SqlType(int4), Default(0) */
+    val union: Rep[Int] = column[Int]("union", O.Default(0))
   }
   /** Collection-like TableQuery object for table tVolumes */
   lazy val tVolumes = new TableQuery(tag => new tVolumes(tag))

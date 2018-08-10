@@ -6,8 +6,11 @@ import akka.actor.typed.{ActorRef, Behavior}
 import akka.actor.typed.scaladsl.AskPattern._
 import com.neo.sk.webSpider.Boot.{executor, scheduler, timeout}
 import com.neo.sk.webSpider.core.IssueActor.{AddUndoArticleList, StartIssue}
+import com.neo.sk.webSpider.core.ProxyActor.GetProxy
 import com.neo.sk.webSpider.models.dao.{ArticleDao, IssueDao}
-import com.neo.sk.webSpider.utils.ChinaClient
+import com.neo.sk.webSpider.utils.{ChinaClient, EducationClient, HttpClientUtil}
+import com.neo.sk.webSpider.Boot.{executor, proxyActor, scheduler, spiderManager, timeout}
+import com.neo.sk.webSpider.core.VolumeActor.StartVolume
 
 import scala.collection.mutable
 import concurrent.duration._
@@ -26,6 +29,8 @@ object SpiderManager {
   private final case object TimeOutKey
 
   case object TimeOut extends Command
+
+  case object StartInit extends Command
 
   case class AddIssueList(list: List[(String,String)]) extends Command
 
@@ -50,6 +55,23 @@ object SpiderManager {
   private def idle(implicit timer: TimerScheduler[Command]): Behavior[Command] = {
     Behaviors.immutable[Command] { (ctx, msg) =>
       msg match {
+        case StartInit=>
+          val future:Future[Option[String]]=proxyActor ? (GetProxy(_))
+          future.map{r=>
+            HttpClientUtil.fetch("https://www.tandfonline.com/loi/mcsh20",r,None,None).map{
+              case Right(t) =>
+                val list=EducationClient.parseVolumeList(t)
+                list.foreach{ r=>
+                  getVolumeActor(ctx,r._2) ! StartVolume(r._1,r._2,r._3)
+                }
+              case Left(e) =>
+                log.info("--- limit")
+
+                timer.startSingleTimer(TimeOutKey,msg,30.seconds)
+            }
+          }
+          Behaviors.same
+
         case TimeOut=>
           val a=hash.dequeue()
           getIssueActor(ctx,a._1,a._2) ! StartIssue(a._1)
@@ -86,7 +108,8 @@ object SpiderManager {
           count2+=1
           if(hash.nonEmpty){
             val a=hash.dequeue()
-            getIssueActor(ctx,a._1,a._2) ! AddUndoArticleList
+//            getIssueActor(ctx,a._1,a._2) ! AddUndoArticleList
+            getIssueActor(ctx,a._1,a._2) ! StartIssue(a._1)
           }
           if(count1==count2){
             log.info("all fetch over")
@@ -109,5 +132,13 @@ object SpiderManager {
       ctx.watchWith(actor,ChildDead(childName,actor))
       actor
     }.upcast[IssueActor.Command]
+  }
+
+  private def getVolumeActor(ctx: ActorContext[Command], url:String) = {
+    val childName = s"issueActor-${url.replace(" ","-").replace("/","-").replace("?","-").replace("=","-")}"
+    log.info(childName)
+    ctx.child(childName).getOrElse {
+      ctx.spawn(VolumeActor.init(url), childName)
+    }.upcast[VolumeActor.Command]
   }
 }

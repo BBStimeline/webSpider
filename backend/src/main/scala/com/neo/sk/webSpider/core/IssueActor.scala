@@ -41,8 +41,8 @@ object IssueActor {
       Behaviors.withTimers[Command] { implicit timer =>
         val hash: mutable.Queue[String] = mutable.Queue()
         ArticleDao.getArticleByIssue(url).map{r=>
-          ctx.self ! SwitchBehavior("idle",idle(url,issue,r.toSet)(hash))
-        }
+        ctx.self ! SwitchBehavior("idle",idle(url,issue,r.toSet)(hash))
+      }
 //        idle(url,issue,Set.empty)(hash)
         busy(Nil)
       }
@@ -78,9 +78,10 @@ object IssueActor {
           msg.list.map{r=>
             if(!hasDone.contains(r._1)){
               hash.enqueue(r._1)
-              ArticleDao.addInfo(SlickTables.rArticles(id = r._1,page= r._2,issue = issue,fulltext = r._3,issueId = url,union = 1))
+              ArticleDao.addInfo(SlickTables.rArticles(id = r._1,page= r._2,issue = issue,fulltext = r._3,issueId = url,union = 2))
             }
           }
+          count1=msg.list.size
           if(msg.list.size>hasDone.size){
             IssueDao.updateIssue(url)
             val t=math.min(7,hash.size-1)
@@ -104,8 +105,8 @@ object IssueActor {
             val t=math.min(5,hash.size-1)
             for(i<-0 to t){
               val a=hash.dequeue()
-//              getArticleActor(ctx,issue,url,a) ! StartRefArticle(baseUrl+a.replace("doi/abs", "doi/ref").replace("doi/full", "doi/ref"))
-              getArticleActor(ctx,issue,url,a) ! StartArticle(baseUrl+a)
+              getArticleActor(ctx,issue,url,a) ! StartRefArticle(baseUrl+a.replace("doi/abs", "doi/ref").replace("doi/full", "doi/ref"))
+//              getArticleActor(ctx,issue,url,a) ! StartArticle(baseUrl+a)
             }
           }
           Behaviors.same
@@ -124,7 +125,8 @@ object IssueActor {
             }
           }else{
             val a=hash.dequeue()
-            getArticleActor(ctx,issue,url,a) ! StartArticle(baseUrl+a)
+//            getArticleActor(ctx,issue,url,a) ! StartArticle(baseUrl+a)
+            getArticleActor(ctx,issue,url,a) ! StartRefArticle(baseUrl+a.replace("doi/abs", "doi/ref").replace("doi/full", "doi/ref"))
             Behaviors.same
           }
 
